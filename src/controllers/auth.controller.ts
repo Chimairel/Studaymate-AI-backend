@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { SignupUserService } from "../services/auth/signup.service";
 import { LoginCredentialsService } from "../services/auth/login.service";
+import { LogoutUserService } from "../services/auth/logout.service";
 
 export class AuthController {
   // Credentials Signup
@@ -22,6 +23,12 @@ export class AuthController {
     }
 
     const result = await LoginCredentialsService(email, password);
+    return res.status(result.code).json(result);
+  };
+
+  // Handle Logout Account
+  public logout = async (req: Request, res: Response) => {
+    const result = await LogoutUserService();
     return res.status(result.code).json(result);
   };
 }
