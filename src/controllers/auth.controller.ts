@@ -24,4 +24,11 @@ export class AuthController {
     const result = await LoginCredentialsService(email, password);
     return res.status(result.code).json(result);
   };
+
+    // Handle Logout
+  public logout = (req: Request, res: Response) => {
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+    return res.status(200).json({ code: 200, status: "success", message: "Logged out successfully" });
+  };
 }
