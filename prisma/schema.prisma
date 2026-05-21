@@ -1,0 +1,39 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id             String    @id @default(uuid())
+  firstName      String
+  lastName       String
+  email          String    @unique
+  password       String
+  role           String    @default("College Student") // "High School Student", "College Student", "Graduate Student"
+  bio            String?   @default("")
+  preferences    Json      // Contains realtimeFeedback, grammarHighlights, weeklyReport, darkMode, defaultEssayMode
+  streak         Int       @default(0)
+  lastActiveDate DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  essays         Essay[]
+}
+
+model Essay {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  content   String   @db.Text
+  type      String   // "Argumentative", "Expository", "Analytical", "Narrative"
+  wordCount Int      @default(0)
+  score     Json?    // Contains overall, structure, argument, grammar, style, vocabulary
+  feedback  Json     @default("[]") // Array of feedback items: [{ type, issue, suggestion, accepted }]
+  status    String   @default("draft") // "draft", "analyzed"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
