@@ -83,7 +83,7 @@ export class StatsService {
         {
           id: "first_draft",
           title: "First Draft",
-          description: "Write your first essay on EssayMind.",
+          description: "Write your first essay on StudyMate.",
           icon: "pencil",
           unlocked: totalEssays >= 1,
           progress: totalEssays >= 1 ? 100 : 0,

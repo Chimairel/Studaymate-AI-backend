@@ -49,7 +49,7 @@ function getMockFeedbackAndScores(essayType: string) {
 
 export async function analyzeEssay(content: string, essayType: string) {
   if (!ENV.GEMINI_API_KEY || ENV.GEMINI_API_KEY === "mock-api-key") {
-    console.warn("⚠️ Using Mock EssayMind AI Analysis: GEMINI_API_KEY is not configured.");
+    console.warn("⚠️ Using Mock StudyMate AI Analysis: GEMINI_API_KEY is not configured.");
     return getMockFeedbackAndScores(essayType);
   }
 
@@ -61,7 +61,7 @@ export async function analyzeEssay(content: string, essayType: string) {
       },
     });
 
-    const systemPrompt = `You are EssayMind, an expert academic writing coach. Analyze the given essay and return ONLY a valid JSON object with no preamble, no markdown, and no extra text. The JSON must follow this exact structure:
+    const systemPrompt = `You are StudyMate, an expert academic writing coach. Analyze the given essay and return ONLY a valid JSON object with no preamble, no markdown, and no extra text. The JSON must follow this exact structure:
 {
   "feedback": [
     {
@@ -113,14 +113,14 @@ export async function chatWithCoach(
   essayType: string = "Argumentative"
 ): Promise<string> {
   if (!ENV.GEMINI_API_KEY || ENV.GEMINI_API_KEY === "mock-api-key") {
-    console.warn("⚠️ Using Mock EssayMind Coach Chat: GEMINI_API_KEY is not configured.");
-    return `Hello! As your EssayMind coach, I've read your draft. You are doing a wonderful job with this ${essayType} essay! Focus on strengthening your thesis and using active transitions between your main arguments. What specific paragraph should we polish next?`;
+    console.warn("⚠️ Using Mock StudyMate Coach Chat: GEMINI_API_KEY is not configured.");
+    return `Hello! As your StudyMate coach, I've read your draft. You are doing a wonderful job with this ${essayType} essay! Focus on strengthening your thesis and using active transitions between your main arguments. What specific paragraph should we polish next?`;
   }
 
   try {
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      systemInstruction: `You are EssayMind, a friendly and expert writing coach. The student is working on a ${essayType} essay. Their current draft is provided below as context. Help them improve their essay by answering their questions clearly, suggesting specific edits, explaining writing concepts, or providing encouragement. Keep responses concise and focused — 2 to 4 sentences unless more detail is needed.
+      systemInstruction: `You are StudyMate, a friendly and expert writing coach. The student is working on a ${essayType} essay. Their current draft is provided below as context. Help them improve their essay by answering their questions clearly, suggesting specific edits, explaining writing concepts, or providing encouragement. Keep responses concise and focused — 2 to 4 sentences unless more detail is needed.
 Essay context:
 ---
 ${essayContent}

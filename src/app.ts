@@ -23,7 +23,7 @@ app.use(cookieParser());
 app.get("/", (req: Request, res: Response) => {
   res.status(200).json({
     status: "success",
-    message: "EssayMind API is healthy",
+    message: "StudyMate API is healthy",
     timestamp: new Date().toISOString(),
     environment: ENV.NODE_ENV,
   });
