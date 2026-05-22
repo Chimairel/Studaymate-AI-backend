@@ -1,6 +1,6 @@
 import "dotenv/config";
-import { Pool } from "pg";
-import { PrismaPg } from "@prisma/adapter-pg";
+import { neon } from "@neondatabase/serverless";
+import { PrismaNeonHttp } from "@prisma/adapter-neon";
 import { PrismaClient } from "@prisma/client";
 
 const connectionString = process.env.DATABASE_URL;
@@ -11,9 +11,8 @@ if (!connectionString) {
 
 console.log("🔌 Database Connection String (masked):", connectionString.replace(/:[^@:]+@/, ":****@"));
 
-const pool = new Pool({ connectionString });
-
-const adapter = new PrismaPg(pool);
+// @ts-ignore
+const adapter = new PrismaNeonHttp(connectionString);
 
 export const prisma = new PrismaClient({ adapter });
 

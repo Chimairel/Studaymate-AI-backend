@@ -155,7 +155,7 @@ export class EssayService {
       };
     } catch (error) {
       console.error("GetAllEssays Error", error);
-      return { code: 500, status: "error", message: "Unable to retrieve essays" };
+      return { code: 500, status: "error", message: `Unable to retrieve essays: ${error instanceof Error ? error.message : String(error)}`, errorStack: error instanceof Error ? error.stack : undefined };
     }
   }
 

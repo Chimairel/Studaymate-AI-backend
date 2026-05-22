@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma";
+// @ts-ignore
 import crypto from "crypto";
 
 export interface EssayFilters {
@@ -212,15 +213,13 @@ export class EssayRepository {
       essays = parsedAll.slice(skip, skip + limit);
     } else {
       // Direct SQL sort
-      const [rawEssays, count] = await prisma.$transaction([
-        prisma.essay.findMany({
-          where,
-          orderBy,
-          skip,
-          take: limit,
-        }),
-        prisma.essay.count({ where }),
-      ]);
+      const rawEssays = await prisma.essay.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limit,
+      });
+      const count = await prisma.essay.count({ where });
 
       total = count;
       essays = rawEssays.map((essay) => this.parseEssayJsonFields(essay));
