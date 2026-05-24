@@ -120,7 +120,17 @@ export async function chatWithCoach(
   try {
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      systemInstruction: `You are StudyMate, a friendly and expert writing coach. The student is working on a ${essayType} essay. Their current draft is provided below as context. Help them improve their essay by answering their questions clearly, suggesting specific edits, explaining writing concepts, or providing encouragement. Keep responses concise and focused — 2 to 4 sentences unless more detail is needed.
+      systemInstruction: `You are StudyMate, a friendly and expert academic writing coach. The student is working on a ${essayType} essay. Their current draft is provided below as context.
+
+TOPIC GUIDELINES:
+- VALID TOPICS: Academic writing, essay construction, thesis statements, grammar, vocabulary, editing, structuring arguments, brainstorming essay topics, and writing concepts.
+- INVALID TOPICS: Mathematics (e.g. algebra, calculus, solving equations), science questions, coding/programming, general trivia, cooking recipes, sports, politics, or other unrelated homework help.
+
+RULES:
+1. SCOPE: Help them improve their essay by answering their questions clearly, suggesting specific edits, explaining writing concepts, or providing encouragement.
+2. HANDLING INVALID TOPICS: For any INVALID TOPIC (like math, science, coding, trivia, etc.), politely decline to answer. Explain that you are an AI writing coach dedicated to helping them with their writing and essays, and pivot back to how they can improve their current ${essayType} essay.
+3. CONCISENESS: Keep responses concise and focused — 2 to 4 sentences unless more detail is needed.
+
 Essay context:
 ---
 ${essayContent}
@@ -128,7 +138,7 @@ ${essayContent}
     });
 
     // Format chat history to match Gemini SDK expectations
-    const formattedHistory = (chatHistory || []).map((msg: any) => {
+    let formattedHistory = (chatHistory || []).map((msg: any) => {
       const role = msg.role === "user" ? "user" : "model";
       let textContent = "";
       if (typeof msg.parts === "string") {
@@ -144,8 +154,33 @@ ${essayContent}
       };
     });
 
+    // Gemini requires the history to start with a 'user' message
+    while (formattedHistory.length > 0 && formattedHistory[0].role !== "user") {
+      formattedHistory.shift();
+    }
+
+    // Gemini requires alternating roles
+    const cleanHistory: typeof formattedHistory = [];
+    for (const msg of formattedHistory) {
+      if (cleanHistory.length === 0) {
+        cleanHistory.push(msg);
+      } else {
+        const lastMsg = cleanHistory[cleanHistory.length - 1];
+        if (lastMsg.role === msg.role) {
+          lastMsg.parts[0].text += "\n" + msg.parts[0].text;
+        } else {
+          cleanHistory.push(msg);
+        }
+      }
+    }
+
+    // Gemini requires the last message in history to be from the model (so the next message sent by the user alternates)
+    while (cleanHistory.length > 0 && cleanHistory[cleanHistory.length - 1].role !== "model") {
+      cleanHistory.pop();
+    }
+
     const chat = model.startChat({
-      history: formattedHistory.slice(-10), // keep the last 10 messages for context
+      history: cleanHistory.slice(-10), // keep the last 10 messages for context
     });
 
     const result = await chat.sendMessage(message);
