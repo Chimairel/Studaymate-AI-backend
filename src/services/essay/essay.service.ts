@@ -1,5 +1,6 @@
 import { EssayRepository, EssayFilters } from "../../repositories/essay.repository";
 import { updateStreakOnActivity } from "../../utils/streak";
+import { prisma } from "../../lib/prisma";
 
 function calculateWordCount(content?: string): number {
   if (!content) return 0;
@@ -40,7 +41,7 @@ export class EssayService {
   async updateEssay(
     userId: string,
     essayId: string,
-    data: { title?: string; content?: string; type?: string; score?: any; feedback?: any[]; wordCount?: number; charCount?: number; subScores?: any }
+    data: { title?: string; content?: string; type?: string; score?: any; feedback?: any[]; wordCount?: number; charCount?: number; subScores?: any; isFavorite?: boolean }
   ) {
     try {
       const existing = await this.essayRepository.findById(essayId);
@@ -59,6 +60,7 @@ export class EssayService {
       }
       if (data.type !== undefined) updateData.type = data.type;
       if (data.wordCount !== undefined && data.content === undefined) updateData.wordCount = data.wordCount;
+      if (data.isFavorite !== undefined) updateData.isFavorite = data.isFavorite;
       
       // Persist analysis results: rebuild score object from subScores + score if provided
       if (data.score !== undefined || data.subScores !== undefined) {
@@ -201,4 +203,85 @@ export class EssayService {
       return { code: 500, status: "error", message: "Unable to update feedback item" };
     }
   }
+
+  async getChatHistory(userId: string, essayId: string) {
+    try {
+      const essay = await this.essayRepository.findById(essayId);
+      if (!essay) {
+        return { code: 404, status: "error", message: "Essay not found" };
+      }
+      if (essay.userId !== userId) {
+        return { code: 403, status: "error", message: "Unauthorized access to essay" };
+      }
+
+      const messages = await prisma.chatMessage.findMany({
+        where: { essayId },
+        orderBy: { timestamp: "asc" },
+      });
+
+      return {
+        code: 200,
+        status: "success",
+        data: messages,
+      };
+    } catch (error) {
+      console.error("GetChatHistory Error", error);
+      return { code: 500, status: "error", message: "Unable to retrieve chat history" };
+    }
+  }
+
+  async addChatMessage(userId: string, essayId: string, data: { sender: string; text: string }) {
+    try {
+      const essay = await this.essayRepository.findById(essayId);
+      if (!essay) {
+        return { code: 404, status: "error", message: "Essay not found" };
+      }
+      if (essay.userId !== userId) {
+        return { code: 403, status: "error", message: "Unauthorized access to essay" };
+      }
+
+      const message = await prisma.chatMessage.create({
+        data: {
+          essayId,
+          sender: data.sender,
+          text: data.text,
+        },
+      });
+
+      return {
+        code: 201,
+        status: "success",
+        data: message,
+      };
+    } catch (error) {
+      console.error("AddChatMessage Error", error);
+      return { code: 500, status: "error", message: "Unable to save chat message" };
+    }
+  }
+
+  async clearChatHistory(userId: string, essayId: string) {
+    try {
+      const essay = await this.essayRepository.findById(essayId);
+      if (!essay) {
+        return { code: 404, status: "error", message: "Essay not found" };
+      }
+      if (essay.userId !== userId) {
+        return { code: 403, status: "error", message: "Unauthorized access to essay" };
+      }
+
+      await prisma.chatMessage.deleteMany({
+        where: { essayId },
+      });
+
+      return {
+        code: 200,
+        status: "success",
+        message: "Chat history cleared successfully",
+      };
+    } catch (error) {
+      console.error("ClearChatHistory Error", error);
+      return { code: 500, status: "error", message: "Unable to clear chat history" };
+    }
+  }
 }
+

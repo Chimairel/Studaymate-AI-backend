@@ -67,7 +67,8 @@ export async function analyzeEssay(content: string, essayType: string) {
     {
       "type": "Clarity or Structure or Grammar or Style",
       "issue": "Brief description of the problem",
-      "suggestion": "Specific, actionable improvement"
+      "suggestion": "Specific, actionable improvement",
+      "original": "The exact original word or phrase from the essay that has the issue (must match a literal substring in the essay, e.g. 'Financail'). Set to null or omit if it is a general style/structural comment."
     }
   ],
   "scores": {

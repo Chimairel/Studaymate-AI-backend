@@ -15,9 +15,9 @@ export class EssayController {
   public update = async (req: Request, res: Response) => {
     const userId = (req as any).userId;
     const id = req.params.id as string;
-    const { title, content, type, score, feedback, wordCount, charCount, subScores } = req.body ?? {};
+    const { title, content, type, score, feedback, wordCount, charCount, subScores, isFavorite } = req.body ?? {};
 
-    const result = await this.essayService.updateEssay(userId, id, { title, content, type, score, feedback, wordCount, charCount, subScores });
+    const result = await this.essayService.updateEssay(userId, id, { title, content, type, score, feedback, wordCount, charCount, subScores, isFavorite });
     return res.status(result.code).json(result);
   };
 
@@ -81,6 +81,35 @@ export class EssayController {
       feedbackId,
       Boolean(accepted)
     );
+    return res.status(result.code).json(result);
+  };
+
+  public getChat = async (req: Request, res: Response) => {
+    const userId = (req as any).userId;
+    const essayId = req.params.id as string;
+
+    const result = await this.essayService.getChatHistory(userId, essayId);
+    return res.status(result.code).json(result);
+  };
+
+  public addChatMessage = async (req: Request, res: Response) => {
+    const userId = (req as any).userId;
+    const essayId = req.params.id as string;
+    const { sender, text } = req.body ?? {};
+
+    if (!sender || !text) {
+      return res.status(400).json({ success: false, message: "Fields 'sender' and 'text' are required" });
+    }
+
+    const result = await this.essayService.addChatMessage(userId, essayId, { sender, text });
+    return res.status(result.code).json(result);
+  };
+
+  public clearChat = async (req: Request, res: Response) => {
+    const userId = (req as any).userId;
+    const essayId = req.params.id as string;
+
+    const result = await this.essayService.clearChatHistory(userId, essayId);
     return res.status(result.code).json(result);
   };
 }

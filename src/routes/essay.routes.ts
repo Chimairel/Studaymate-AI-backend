@@ -17,4 +17,9 @@ router.put("/:id", validateSchema(updateEssaySchema), essayController.update);
 router.delete("/:id", essayController.delete);
 router.patch("/:id/feedback/:feedbackId", essayController.updateFeedback);
 
+// Chat History Endpoints
+router.get("/:id/chat", essayController.getChat);
+router.post("/:id/chat", essayController.addChatMessage);
+router.delete("/:id/chat", essayController.clearChat);
+
 export default router;

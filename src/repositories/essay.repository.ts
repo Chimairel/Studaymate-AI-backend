@@ -94,6 +94,7 @@ export class EssayRepository {
       subScores,
       feedback: mappedFeedback,
       status: essay.status,
+      isFavorite: Boolean(essay.isFavorite),
       createdAt: essay.createdAt,
       updatedAt: essay.updatedAt,
     };

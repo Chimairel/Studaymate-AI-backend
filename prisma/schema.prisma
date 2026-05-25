@@ -33,7 +33,19 @@ model Essay {
   wordCount Int      @default(0)
   score     Json?    // Contains overall, structure, argument, grammar, style, vocabulary
   feedback  Json     @default("[]") // Array of feedback items: [{ type, issue, suggestion, accepted }]
-  status    String   @default("draft") // "draft", "analyzed"
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  status       String        @default("draft") // "draft", "analyzed"
+  isFavorite   Boolean       @default(false)
+  chatMessages ChatMessage[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  essayId   String
+  essay     Essay    @relation(fields: [essayId], references: [id], onDelete: Cascade)
+  sender    String   // "coach" | "user"
+  text      String   @db.Text
+  timestamp DateTime @default(now())
+}
+
