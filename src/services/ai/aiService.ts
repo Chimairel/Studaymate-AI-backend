@@ -4,6 +4,12 @@ import crypto from "crypto";
 
 const genAI = new GoogleGenerativeAI(ENV.GEMINI_API_KEY || "mock-api-key");
 
+const MODELS = [
+  "gemini-2.5-flash-lite",
+  "gemini-2.5-flash",
+  "gemini-2.5-pro"
+];
+
 function getMockFeedbackAndScores(essayType: string) {
   return {
     feedback: [
@@ -47,21 +53,75 @@ function getMockFeedbackAndScores(essayType: string) {
   };
 }
 
+function getSpecificErrorMessage(error: any): string {
+  const errMsg = (error?.message || String(error)).toLowerCase();
+  const errStatus = error?.status || error?.statusCode;
+  const errCode = error?.code;
+
+  if (
+    errStatus === 429 ||
+    errCode === "RESOURCE_EXHAUSTED" ||
+    errMsg.includes("429") ||
+    errMsg.includes("quota") ||
+    errMsg.includes("exhausted") ||
+    errMsg.includes("limit exceeded") ||
+    errMsg.includes("rate limit") ||
+    errMsg.includes("too many requests")
+  ) {
+    return "API Quota Exceeded: The AI API rate limit or quota has been reached. Please check your Gemini account billing or wait a moment before trying again.";
+  }
+
+  if (
+    (errStatus === 400 && (errMsg.includes("key") || errMsg.includes("api_key") || errMsg.includes("invalid"))) ||
+    errMsg.includes("api_key_invalid") ||
+    errMsg.includes("invalid api key") ||
+    errMsg.includes("key not valid") ||
+    errMsg.includes("api key not found") ||
+    errMsg.includes("api key invalid") ||
+    (errMsg.includes("400") && errMsg.includes("key"))
+  ) {
+    return "Invalid API Key: The configured Gemini API key is invalid or unauthorized. Please verify the GEMINI_API_KEY environment variable in your backend .env file.";
+  }
+
+  if (
+    errMsg.includes("fetch failed") ||
+    errMsg.includes("network") ||
+    errMsg.includes("connect") ||
+    errMsg.includes("timeout") ||
+    errMsg.includes("enotfound") ||
+    errMsg.includes("eai_again") ||
+    errMsg.includes("socket") ||
+    errMsg.includes("offline") ||
+    errMsg.includes("dns")
+  ) {
+    return "Network Problem: Unable to connect to the Gemini API servers. Please check your internet connection and try again.";
+  }
+
+  if (errMsg.includes("safety") || errMsg.includes("blocked") || errMsg.includes("candidate")) {
+    return "Safety/Content Policy: The response was blocked by safety settings. Please try rephrasing your prompt or essay content.";
+  }
+
+  return `Service Error: ${error?.message || String(error)}`;
+}
+
 export async function analyzeEssay(content: string, essayType: string) {
   if (!ENV.GEMINI_API_KEY || ENV.GEMINI_API_KEY === "mock-api-key") {
     console.warn("⚠️ Using Mock StudyMate AI Analysis: GEMINI_API_KEY is not configured.");
     return getMockFeedbackAndScores(essayType);
   }
 
-  try {
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: {
-        responseMimeType: "application/json",
-      },
-    });
+  let lastError: any;
 
-    const systemPrompt = `You are StudyMate, an expert academic writing coach. Analyze the given essay and return ONLY a valid JSON object with no preamble, no markdown, and no extra text. The JSON must follow this exact structure:
+  for (const modelName of MODELS) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          responseMimeType: "application/json",
+        },
+      });
+
+      const systemPrompt = `You are StudyMate, an expert academic writing coach. Analyze the given essay and return ONLY a valid JSON object with no preamble, no markdown, and no extra text. The JSON must follow this exact structure:
 {
   "feedback": [
     {
@@ -82,32 +142,34 @@ export async function analyzeEssay(content: string, essayType: string) {
 }
 Provide 3 to 6 feedback items. Be specific and constructive. Essay type: ${essayType}.`;
 
-    const response = await model.generateContent([
-      { text: systemPrompt },
-      { text: `Essay Content:\n${content}` },
-    ]);
+      const response = await model.generateContent([
+        { text: systemPrompt },
+        { text: `Essay Content:\n${content}` },
+      ]);
 
-    const text = response.response.text();
-    const parsed = JSON.parse(text);
+      const text = response.response.text();
+      const parsed = JSON.parse(text);
 
-    // Ensure feedback items have unique IDs for acceptance/dismissal tracking
-    if (parsed.feedback && Array.isArray(parsed.feedback)) {
-      parsed.feedback = parsed.feedback.map((item: any) => ({
-        id: crypto.randomUUID(),
-        accepted: false,
-        ...item,
-      }));
+      // Ensure feedback items have unique IDs for acceptance/dismissal tracking
+      if (parsed.feedback && Array.isArray(parsed.feedback)) {
+        parsed.feedback = parsed.feedback.map((item: any) => ({
+          id: crypto.randomUUID(),
+          accepted: false,
+          ...item,
+        }));
+      }
+
+      return parsed;
+    } catch (error) {
+      console.warn(`Model ${modelName} failed in analyzeEssay, falling back...`, error);
+      lastError = error;
     }
-
-    return parsed;
-  } catch (error) {
-    console.error("AI analyzeEssay Error:", error);
-    // Graceful fallback to mock response so app doesn't crash on bad API key / network
-    return getMockFeedbackAndScores(essayType);
   }
-}
 
-export async function chatWithCoach(
+  console.error("AI analyzeEssay Error: All generative models failed.", lastError);
+  const specificError = getSpecificErrorMessage(lastError);
+  throw new Error(specificError);
+}export async function chatWithCoach(
   message: string,
   essayContent: string,
   chatHistory: any[] = [],
@@ -118,10 +180,13 @@ export async function chatWithCoach(
     return `Hello! As your StudyMate coach, I've read your draft. You are doing a wonderful job with this ${essayType} essay! Focus on strengthening your thesis and using active transitions between your main arguments. What specific paragraph should we polish next?`;
   }
 
-  try {
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      systemInstruction: `You are StudyMate, a friendly and expert academic writing coach. The student is working on a ${essayType} essay. Their current draft is provided below as context.
+  let lastError: any;
+
+  for (const modelName of MODELS) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        systemInstruction: `You are StudyMate, a friendly and expert academic writing coach. The student is working on a ${essayType} essay. Their current draft is provided below as context.
 
 TOPIC GUIDELINES:
 - VALID TOPICS: Academic writing, essay construction, thesis statements, grammar, vocabulary, editing, structuring arguments, brainstorming essay topics, and writing concepts.
@@ -136,60 +201,66 @@ Essay context:
 ---
 ${essayContent}
 ---`,
-    });
+      });
 
-    // Format chat history to match Gemini SDK expectations
-    let formattedHistory = (chatHistory || []).map((msg: any) => {
-      const role = msg.role === "user" ? "user" : "model";
-      let textContent = "";
-      if (typeof msg.parts === "string") {
-        textContent = msg.parts;
-      } else if (Array.isArray(msg.parts) && msg.parts[0]?.text) {
-        textContent = msg.parts[0].text;
-      } else if (msg.content) {
-        textContent = msg.content;
+      // Format chat history to match Gemini SDK expectations
+      let formattedHistory = (chatHistory || []).map((msg: any) => {
+        const role = msg.role === "user" ? "user" : "model";
+        let textContent = "";
+        if (typeof msg.parts === "string") {
+          textContent = msg.parts;
+        } else if (Array.isArray(msg.parts) && msg.parts[0]?.text) {
+          textContent = msg.parts[0].text;
+        } else if (msg.content) {
+          textContent = msg.content;
+        }
+        return {
+          role,
+          parts: [{ text: textContent }],
+        };
+      });
+
+      // Gemini requires the history to start with a 'user' message
+      while (formattedHistory.length > 0 && formattedHistory[0].role !== "user") {
+        formattedHistory.shift();
       }
-      return {
-        role,
-        parts: [{ text: textContent }],
-      };
-    });
 
-    // Gemini requires the history to start with a 'user' message
-    while (formattedHistory.length > 0 && formattedHistory[0].role !== "user") {
-      formattedHistory.shift();
-    }
-
-    // Gemini requires alternating roles
-    const cleanHistory: typeof formattedHistory = [];
-    for (const msg of formattedHistory) {
-      if (cleanHistory.length === 0) {
-        cleanHistory.push(msg);
-      } else {
-        const lastMsg = cleanHistory[cleanHistory.length - 1];
-        if (lastMsg.role === msg.role) {
-          lastMsg.parts[0].text += "\n" + msg.parts[0].text;
-        } else {
+      // Gemini requires alternating roles
+      const cleanHistory: typeof formattedHistory = [];
+      for (const msg of formattedHistory) {
+        if (cleanHistory.length === 0) {
           cleanHistory.push(msg);
+        } else {
+          const lastMsg = cleanHistory[cleanHistory.length - 1];
+          if (lastMsg.role === msg.role) {
+            lastMsg.parts[0].text += "\n" + msg.parts[0].text;
+          } else {
+            cleanHistory.push(msg);
+          }
         }
       }
+
+      // Gemini requires the last message in history to be from the model (so the next message sent by the user alternates)
+      while (cleanHistory.length > 0 && cleanHistory[cleanHistory.length - 1].role !== "model") {
+        cleanHistory.pop();
+      }
+
+      const chat = model.startChat({
+        history: cleanHistory.slice(-10), // keep the last 10 messages for context
+      });
+
+      const result = await chat.sendMessage(message);
+      return result.response.text();
+    } catch (error: any) {
+      console.warn(`Model ${modelName} failed in chatWithCoach, falling back...`, error);
+      lastError = error;
     }
-
-    // Gemini requires the last message in history to be from the model (so the next message sent by the user alternates)
-    while (cleanHistory.length > 0 && cleanHistory[cleanHistory.length - 1].role !== "model") {
-      cleanHistory.pop();
-    }
-
-    const chat = model.startChat({
-      history: cleanHistory.slice(-10), // keep the last 10 messages for context
-    });
-
-    const result = await chat.sendMessage(message);
-    return result.response.text();
-  } catch (error) {
-    console.error("AI chatWithCoach Error:", error);
-    return "I'm having a little trouble connecting to my cognitive services right now, but please review your introduction paragraph and make sure your main claim is clear and well-supported!";
   }
+
+  // If we reach here, all models failed
+  console.error("AI chatWithCoach Error: All generative models failed.", lastError);
+  const errorMsg = getSpecificErrorMessage(lastError);
+  return `StudyMate Coach Error: ${errorMsg}\n\n(Please check your connection, API key, or quota usage, and try again!)`;
 }
 
 export async function scoreEssay(content: string, essayType: string) {
